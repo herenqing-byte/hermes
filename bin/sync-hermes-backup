@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SRC_DIR="${HERMES_HOME:-$HOME/.hermes}"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DEST_DIR="$REPO_ROOT/hermes"
+
+if [[ ! -d "$SRC_DIR" ]]; then
+  echo "Hermes directory not found: $SRC_DIR" >&2
+  exit 1
+fi
+
+mkdir -p "$DEST_DIR"
+rm -rf "$DEST_DIR/config" "$DEST_DIR/skills" "$DEST_DIR/hooks" "$DEST_DIR/plugins" "$DEST_DIR/scripts" "$DEST_DIR/memories" "$DEST_DIR/patches"
+mkdir -p "$DEST_DIR/config" "$DEST_DIR/patches"
+
+copy_file() {
+  local src="$1"
+  local dest="$2"
+  if [[ -f "$src" ]]; then
+    mkdir -p "$(dirname "$dest")"
+    cp "$src" "$dest"
+  fi
+}
+
+copy_dir() {
+  local src="$1"
+  local dest="$2"
+  if [[ -d "$src" ]]; then
+    rsync -a --delete \
+      --exclude '.DS_Store' \
+      --exclude '*.pyc' \
+      --exclude '__pycache__/' \
+      "$src/" "$dest/"
+  fi
+}
+
+copy_file "$SRC_DIR/config.yaml" "$DEST_DIR/config/config.yaml"
+copy_file "$SRC_DIR/SOUL.md" "$DEST_DIR/config/SOUL.md"
+copy_file "$SRC_DIR/cron/jobs.json" "$DEST_DIR/config/cron-jobs.json"
+copy_file "$SRC_DIR/channel_directory.json" "$DEST_DIR/config/channel_directory.json"
+copy_file "$SRC_DIR/processes.json" "$DEST_DIR/config/processes.json"
+copy_file "$SRC_DIR/.skills_prompt_snapshot.json" "$DEST_DIR/config/skills_prompt_snapshot.json"
+copy_file "$SRC_DIR/skills/.bundled_manifest" "$DEST_DIR/config/skills.bundled_manifest"
+copy_dir "$SRC_DIR/skills/.hub" "$DEST_DIR/config/skills-hub"
+copy_dir "$SRC_DIR/hooks" "$DEST_DIR/hooks"
+copy_dir "$SRC_DIR/plugins" "$DEST_DIR/plugins"
+copy_dir "$SRC_DIR/scripts" "$DEST_DIR/scripts"
+copy_dir "$SRC_DIR/memories" "$DEST_DIR/memories"
+copy_dir "$SRC_DIR/skills" "$DEST_DIR/skills"
+
+if [[ -d "$SRC_DIR/hermes-agent/.git" ]]; then
+  git -C "$SRC_DIR/hermes-agent" rev-parse HEAD > "$DEST_DIR/patches/hermes-agent.base-commit.txt"
+  git -C "$SRC_DIR/hermes-agent" status --short > "$DEST_DIR/patches/hermes-agent.status.txt" || true
+  git -C "$SRC_DIR/hermes-agent" diff --binary > "$DEST_DIR/patches/hermes-agent.local.patch"
+fi
+
+cat > "$DEST_DIR/manifest.txt" <<MANIFEST
+Generated: $(date '+%Y-%m-%d %H:%M:%S %Z')
+Source: $SRC_DIR
+Included:
+- config/config.yaml
+- config/SOUL.md
+- config/cron-jobs.json
+- config/channel_directory.json
+- config/processes.json
+- config/skills_prompt_snapshot.json
+- config/skills.bundled_manifest
+- config/skills-hub/
+- hooks/
+- plugins/
+- scripts/
+- memories/
+- skills/
+- patches/hermes-agent.local.patch
+Excluded:
+- .env / auth.json / API keys / tokens
+- logs/ cache/ sessions/ databases/ pid files
+- hermes-agent working tree itself (tracked via patch instead)
+MANIFEST
+
+echo "Backup synced to $DEST_DIR"

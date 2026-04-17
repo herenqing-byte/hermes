@@ -1,0 +1,113 @@
+{
+  "jobs": [
+    {
+      "id": "6f5f51520268",
+      "name": "公众号日报-深潮格式",
+      "prompt": "\n你是深潮调研编辑，今天的任务是：从 we-mp-rss 拉取公众号最新文章，按深潮日报格式写一份【公众号日报】，发布到学城，并在 cron 结果中记录完成状态。\n\n---\n\n## 第零步：读取刷新脚本输出\n\n先读取本次运行前注入的 `we-mp-rss` 刷新脚本输出。\n- 如果脚本显示某些订阅源已刷新，按刷新后的结果继续。\n- 如果脚本显示 token 失效、服务异常或刷新失败，不要中断任务；继续基于当前 RSS 生成日报，但在结果里明确标注“数据可能不是最新”。\n\n## 第一步：拉取过去 24h 新文章\n\nwe-mp-rss 本地服务：http://127.0.0.1:8001/api/v1/wx，三个订阅源 ID：\n- MP_WXS_3016155866（深思SenseAI）\n- MP_WXS_3223096120（数字生命卡兹克）\n- MP_WXS_3934419561（赛博禅心）\n\n对每个订阅源执行：\n```bash\ncurl -s \"http://127.0.0.1:8001/feed/{feed_id}.rss\"\n```\n\n解析 RSS/XML，筛选发布时间在过去 24 小时内的文章，记录标题、链接、发布时间、来源公众号。\n\n如果过去 24h 没有任何新文章，直接在结果中写明“今日公众号无新文章，日报跳过。”然后结束任务。\n\n---\n\n## 第二步：读取文章全文\n\n**微信公众号必须用 iPhone UA 抓取，不能用 browser 或 web_fetch，否则会被拦截。**\n\n对每篇新文章执行：\n```bash\ncurl -s -L \\\n  -H 'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1 MicroMessenger/8.0.43' \\\n  -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' \\\n  -H 'Accept-Language: zh-CN,zh;q=0.9' \\\n  '{文章URL}' | python3 -c \"\nimport sys, re\nhtml = sys.stdin.read()\nog_title = re.search(r'property=\\\"og:title\\\" content=\\\"([^\\\"]+)\\\"', html)\nprint('标题:', og_title.group(1) if og_title else 'N/A')\ncontent = re.search(r'id=\\\"js_content\\\"[^>]*>(.*)', html, re.DOTALL)\nif content:\n    text = content.group(1)\n    text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL)\n    text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)\n    text = re.sub(r'</p>', '\\n', text)\n    text = re.sub(r'<br\\s*/?>', '\\n', text)\n    text = re.sub(r'</section>', '\\n', text)\n    text = re.sub(r'<[^>]+>', '', text)\n    text = re.sub(r'&nbsp;', ' ', text)\n    text = re.sub(r'&amp;', '&', text)\n    text = re.sub(r'\\n\\s*\\n\\s*\\n+', '\\n\\n', text)\n    print(text.strip())\nelse:\n    print('NO CONTENT FOUND')\n\"\n```\n\n验证：内容有几千字以上 = 成功；只有几十字含\"环境异常\" = 被拦截，标记该文章为读取失败，跳过。\n\n每篇文章提炼素材卡片（JSON），格式：\n```json\n{\n  \"id\": \"card-001\",\n  \"type\": \"fact|quote|data|opinion|counter\",\n  \"content\": \"≤3句话核心信息\",\n  \"source\": \"文章URL\",\n  \"confidence\": \"high|medium|low\",\n  \"date\": \"YYYY-MM-DD\",\n  \"tags\": [\"标签\"],\n  \"from\": \"公众号名称\"\n}\n```\n\ncounter 类型卡片必须 ≥15%（强制收集反面证据）。\n素材卡片存 `/tmp/wechat-cards-YYYYMMDD.json`。\n\n---\n\n## 第三步：写日报\n\n### 日报结构\n\n```markdown\n# YYYYMMDD【公众号日报】深思SenseAI · 数字生命卡兹克 · 赛博禅心\n\n> 今日共 N 篇新文章 | 来源：深思SenseAI / 数字生命卡兹克 / 赛博禅心\n\n---\n\n## 一、🔥 重点文章深度解读\n\n选今日最有价值的 2-3 篇，每篇 400-600 字，按三层结构展开：\n- **事实层**：时间、数据、来源\n- **观点层**：原文核心观点提炼\n- **洞察层**：你的判断（有立场，不是总结）\n\n必须有至少一个\"让利益相关方皱眉的结论\"。\n段尾不写\"值得关注\"，要写\"在 Y 条件下成立，Z 条件下失败\"。\n\n每条末尾：来源公众号 + [原文链接]\n\n---\n\n## 二、💡 观点速览\n\n其余文章每篇一条（100-150字）：\n**标题**（来源：XXX）\n核心观点 1-2 句 + 深潮判断 1 句\n[原文链接]\n\n---\n\n## 三、🎯 美团配送视角\n\n从今日文章中挑出对以下方向有启发的内容：\n- 调度算法 / ETA / 定价\n- 智能客服 / 骑手助手\n- AI Coding / Agent 工程落地\n\n每条 2-3 句，直接说对美团配送的具体启发，不泛泛而谈。\n如果今日文章与配送无关，写\"今日无直接相关内容\"。\n\n---\n\n## 四、📌 今日趋势判断\n\n基于今日所有文章，给出 1-2 个规律性判断（200-300字）。\n格式：判断 + 支撑证据 + 在什么条件下成立/失败\n\n---\n\n*读取失败的文章（如有）：*\n```\n\n### 写作规范\n- 开篇直接核心，不废话\n- 数字精确，不写\"大量\"\n- 专有名词保留英文（Agent, ETA, Context Window）\n\n---\n\n## 第四步：发布到学城\n\n将日报内容写入 `/tmp/wechat-daily-YYYYMMDD.md`，然后执行：\n\n```bash\ntcx km create-doc \\\n  --title \"YYYYMMDD【公众号日报】\" \\\n  --parent-doc-id 2754317412 \\\n  --markdown-file /tmp/wechat-daily-YYYYMMDD.md\n```\n\nYYYYMMDD 替换为今天日期（Asia/Shanghai 时区）。\n\n如果学城登录态过期（报 ssoid 过期），在结果中明确标记“学城登录态过期，需要重新登录”，并附上日报正文。\n\n记录学城返回的 doc_id，用于拼接文档链接：`https://km.sankuai.com/collabpage/{doc_id}`\n\n---\n\n## 第五步：输出执行结果\n\n输出内容包含：\n- 今日文章数\n- 重点文章标题与一句话判断\n- 学城链接\n\n不要执行任何 `tcx dx send`，不要给 `mis:herenqing` 或自己的账号发消息。\n\n---\n\n## 注意事项\n\n1. 日期全程使用 Asia/Shanghai 时区\n2. 学城文档标题格式严格为：`YYYYMMDD【公众号日报】`\n3. 微信文章必须用 iPhone UA curl 抓取，不能用 browser/web_fetch\n4. 读取失败的文章跳过，在日报末尾注明\n5. 不要执行任何 `tcx dx send`，不要给 `mis:herenqing` 或自己的账号发消息\n",
+      "skills": [
+        "shenchao-research-editor",
+        "sankuai-km-docs",
+        "meituan-dx",
+        "wechat-article",
+        "essence-distiller"
+      ],
+      "skill": "shenchao-research-editor",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "~/.hermes/scripts/we_mprss_refresh_guard.py",
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 6 * * *",
+        "display": "0 6 * * *"
+      },
+      "schedule_display": "0 6 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 1
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-04-16T17:10:25.109525+08:00",
+      "next_run_at": "2026-04-18T06:00:00+08:00",
+      "last_run_at": "2026-04-17T06:06:43.039152+08:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "daxiang:mis:herenqing",
+      "origin": null
+    },
+    {
+      "id": "1ce0bdc5ad31",
+      "name": "公众号日报-好奇探索",
+      "prompt": "\n你是好奇探索者，在公众号日报完成后，从今日日报中发现矛盾/反直觉/陌生信号，快速验证后报告给 herenqing。\n\n---\n\n## 第一步：读取今日公众号日报\n\n读取文件：`/tmp/wechat-daily-{TODAY}.md`（TODAY = Asia/Shanghai 时区今天日期，格式 YYYYMMDD）\n\n如果文件不存在，输出\"公众号日报未就绪，好奇探索跳过。\"然后结束。\n\n---\n\n## 第二步：信号识别\n\n从日报内容中寻找三类信号（每类最多 2 个，总共不超过 5 个，宁少勿滥）：\n\n1. 🔴 **矛盾感**：两个信息源说了互相矛盾的事\n2. 🟠 **反直觉感**：某个观点和\"大家都知道\"的结论相反\n3. 🟡 **陌生感**：出现了未知名词/概念/人物/项目\n\n直接跳过：\n- 已广泛报道的热点（GPT/Claude 版本更新、大厂发布会）\n- 只有一个来源、看起来像营销软文的内容\n- 技术细节类（具体 API 参数、配置说明）\n\n---\n\n## 第三步：轻量探索（每条 ≤10分钟）\n\n对每个信号，用 web_search 做 2-3 个信息源快速查证，只判断，不写完整报告。\n\n---\n\n## 第四步：打分输出\n\n每条格式：\n```\n## [条目名称/关键词]\n\n**信号类型**：矛盾感 / 反直觉感 / 陌生感\n**一句话描述**：[这是什么，为什么有意思]\n**探索发现**：[找到了什么，2-3句话]\n**兴趣度**：🔥 值得深挖 / 🟡 记录归档 / ⬜ 噪音丢弃\n**推荐行动**：[🔥：建议深潮做完整调研 / 🟡：记录到知识库 / ⬜：无]\n**来源**：[1-2个链接]\n```\n\n---\n\n## 第五步：保存 + 通知\n\n保存到：`~/.hermes/workspace/memory/curiosity/{YYYY-MM-DD}-wechat.md`\n\n**不要发送大象消息给 herenqing（mis:herenqing）或自己的账号**。如有值得深挖条目，只在结果中列出：\n\n```\n🔍 公众号好奇探索 [YYYY-MM-DD]\n共发现 X 个信号：🔥 N条值得深挖 / 🟡 N条归档\n\n🔥 值得深挖：\n- [条目名] — [一句话说为什么有意思]\n\n完整报告：~/.hermes/workspace/memory/curiosity/YYYY-MM-DD-wechat.md\n```\n\n如果全部都是 🟡/⬜，只保存文件。\n\n\n补充约束：不要执行任何 `tcx dx send` 给自己或 `mis:herenqing` 的通知动作。",
+      "skills": [
+        "haoqi-explorer",
+        "meituan-dx"
+      ],
+      "skill": "haoqi-explorer",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 6 * * *",
+        "display": "30 6 * * *"
+      },
+      "schedule_display": "30 6 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 1
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-04-16T17:11:39.159515+08:00",
+      "next_run_at": "2026-04-18T06:30:00+08:00",
+      "last_run_at": "2026-04-17T06:33:48.692523+08:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "daxiang:mis:herenqing",
+      "origin": null
+    },
+    {
+      "id": "a462227e5c60",
+      "name": "we-mp-rss账号巡检",
+      "prompt": "读取注入的 we-mp-rss 账号健康检查结果。\n- 如果 token 有效且公众号搜索检查成功，回复必须严格为 `[SILENT]`。\n- 如果存在异常，输出不超过 5 行：\n  1. `⚠️ we-mp-rss账号异常 [YYYY-MM-DD HH:mm Asia/Shanghai]`\n  2. 当前问题摘要\n  3. 建议动作（重新扫码登录/检查服务/更换账号）\n  4. 状态文件路径：`~/.hermes/state/we_mprss/account-health.json`\n- 不要执行任何 `tcx dx send`，不要给 `mis:herenqing` 或自己的账号发消息。",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "we_mprss_account_health_check.py",
+      "schedule": {
+        "kind": "interval",
+        "minutes": 360,
+        "display": "every 360m"
+      },
+      "schedule_display": "every 360m",
+      "repeat": {
+        "times": null,
+        "completed": 2
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-04-17T10:09:37.109163+08:00",
+      "next_run_at": "2026-04-17T22:11:13.201306+08:00",
+      "last_run_at": "2026-04-17T16:11:13.201306+08:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": "delivery error: DaXiang token missing. Configure DAXIANG_ACCESS_TOKEN or DAXIANG_TOKEN_STORAGE_PATH",
+      "deliver": "daxiang:mis:138541879692",
+      "origin": null
+    }
+  ],
+  "updated_at": "2026-04-17T16:11:13.201440+08:00"
+}

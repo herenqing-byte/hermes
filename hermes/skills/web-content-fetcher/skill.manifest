@@ -1,0 +1,6 @@
+skill-manifest-version: 1
+skill-id: f05cf026aa716b0684d69ffb60f4c9ad69f2c90ed12ab60c77c0e94e444e602b
+
+files:
+  dbde905a1b57eb42b3cd1cbf2e18a1c64aadfc5cf21800ca43b3c7db41d47494  SKILL.md
+  a71913730e6a2d7e66cfb6e29373abffdcd801325c4ff781617af8a2c3263a46  scripts/fetch.py

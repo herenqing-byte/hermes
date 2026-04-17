@@ -1,0 +1,403 @@
+#!/usr/bin/env python3
+"""
+大象(Daxiang) 群聊消息读取脚本。
+通过 CDP 连接浏览器，导航到指定群聊，展开被折叠的长消息，提取干净的消息列表。
+
+用法:
+  python3 dx_read_messages.py <chat_url> [--output /tmp/messages.json] [--date 03-11] [--scroll 5]
+
+输出 JSON 格式:
+  [{"time": "03-11 09:30", "sender": "大象机器人", "text": "..."}, ...]
+"""
+import json, sys, time, argparse, os, re
+
+os.environ['NO_PROXY'] = '*'
+os.environ['no_proxy'] = '*'
+
+try:
+    import requests, websocket
+except ImportError:
+    print("ERROR: pip install requests websocket-client", file=sys.stderr)
+    sys.exit(1)
+
+CDP_URL = "http://127.0.0.1:9222"
+
+# ── CDP helpers ──────────────────────────────────────────────
+
+_msg_id = 0
+
+def _get_tabs():
+    return requests.get(f"{CDP_URL}/json", proxies={"http": None, "https": None}).json()
+
+def _get_ws(url_fragment):
+    for t in _get_tabs():
+        if url_fragment in t.get("url", ""):
+            return t["webSocketDebuggerUrl"]
+    return None
+
+def cdp_eval(ws, js):
+    global _msg_id; _msg_id += 1
+    ws.send(json.dumps({"id": _msg_id, "method": "Runtime.evaluate",
+                         "params": {"expression": js, "returnByValue": True}}))
+    while True:
+        r = json.loads(ws.recv())
+        if r.get("id") == _msg_id:
+            v = r.get("result", {}).get("result", {})
+            return v.get("value")
+
+def cdp_nav(ws, url):
+    global _msg_id; _msg_id += 1
+    ws.send(json.dumps({"id": _msg_id, "method": "Page.navigate", "params": {"url": url}}))
+    while True:
+        r = json.loads(ws.recv())
+        if r.get("id") == _msg_id:
+            return r
+
+def mouse_click(ws, x, y):
+    global _msg_id
+    for t in ["mousePressed", "mouseReleased"]:
+        _msg_id += 1
+        ws.send(json.dumps({"id": _msg_id, "method": "Input.dispatchMouseEvent",
+                             "params": {"type": t, "x": int(x), "y": int(y),
+                                        "button": "left", "clickCount": 1}}))
+        while True:
+            r = json.loads(ws.recv())
+            if r.get("id") == _msg_id:
+                break
+    time.sleep(0.2)
+
+# ── 核心逻辑 ─────────────────────────────────────────────────
+
+def navigate_to_chat(ws, chat_url, wait=6):
+    """导航到群聊页面并等待加载"""
+    cdp_nav(ws, chat_url)
+    time.sleep(wait)
+    url = cdp_eval(ws, "window.location.href")
+    if not url or "x.sankuai.com" not in url:
+        print(f"WARNING: 当前页面 {url}，可能未正确导航", file=sys.stderr)
+    return url
+
+def expand_messages_by_js(ws, date_prefix=None):
+    """通过 JS 直接 click() 展开折叠消息，不依赖鼠标坐标。
+    如果指定 date_prefix，只展开该日期前缀的消息。
+    返回展开数量。"""
+    js = """(() => {
+        const DATE_PREFIX = __DATE_PREFIX__;
+        const spans = document.querySelectorAll('span.show-long-text');
+        let expanded = 0;
+        for (const span of spans) {
+            if (DATE_PREFIX) {
+                // 只展开匹配日期的消息
+                const bubble = span.closest('.bubble-item');
+                if (!bubble) continue;
+                const timeEl = bubble.querySelector('.bubble-item-time');
+                if (!timeEl) continue;
+                const timeText = timeEl.textContent.trim();
+                if (!timeText.startsWith(DATE_PREFIX)) continue;
+            }
+            span.click();
+            expanded++;
+        }
+        return expanded;
+    })()"""
+    date_val = json.dumps(date_prefix) if date_prefix else "null"
+    js = js.replace("__DATE_PREFIX__", date_val)
+    n = cdp_eval(ws, js)
+    if n and n > 0:
+        # 等待 DOM 更新
+        time.sleep(min(n * 0.3, 5))
+    return n or 0
+
+
+def expand_all_truncated(ws, date_prefix=None):
+    """展开被折叠的长消息。优先用 JS click()，失败则回退到鼠标点击。
+    如果指定 date_prefix，只展开该日期的消息。"""
+    total = expand_messages_by_js(ws, date_prefix)
+    if total > 0:
+        print(f"  JS展开了 {total} 条消息", file=sys.stderr)
+
+    # 验证是否还有未展开的
+    remaining = cdp_eval(ws, """(() => {
+        const DATE_PREFIX = __DATE_PREFIX__;
+        const spans = document.querySelectorAll('span.show-long-text');
+        let count = 0;
+        for (const span of spans) {
+            if (DATE_PREFIX) {
+                const bubble = span.closest('.bubble-item');
+                if (!bubble) continue;
+                const timeEl = bubble.querySelector('.bubble-item-time');
+                if (!timeEl) continue;
+                if (!timeEl.textContent.trim().startsWith(DATE_PREFIX)) continue;
+            }
+            count++;
+        }
+        return count;
+    })()""".replace("__DATE_PREFIX__", json.dumps(date_prefix) if date_prefix else "null"))
+
+    if remaining and remaining > 0:
+        print(f"  仍有 {remaining} 条未展开，尝试鼠标点击...", file=sys.stderr)
+        for _ in range(remaining + 5):
+            pos = cdp_eval(ws, """(() => {
+                const DATE_PREFIX = __DATE_PREFIX__;
+                const spans = document.querySelectorAll('span.show-long-text');
+                for (const span of spans) {
+                    if (DATE_PREFIX) {
+                        const bubble = span.closest('.bubble-item');
+                        if (!bubble) continue;
+                        const timeEl = bubble.querySelector('.bubble-item-time');
+                        if (!timeEl) continue;
+                        if (!timeEl.textContent.trim().startsWith(DATE_PREFIX)) continue;
+                    }
+                    span.scrollIntoView({block: 'center'});
+                    const r = span.getBoundingClientRect();
+                    if (r.width > 0 && r.height > 0)
+                        return {x: r.x + r.width/2, y: r.y + r.height/2};
+                }
+                return null;
+            })()""".replace("__DATE_PREFIX__", json.dumps(date_prefix) if date_prefix else "null"))
+            if not pos:
+                break
+            mouse_click(ws, pos["x"], pos["y"])
+            time.sleep(1)
+            total += 1
+
+    return total
+
+
+def extract_messages(ws, date_prefix=None):
+    """从当前页面提取消息，返回 [{time, sender, text}]。
+    提取 .dx-message-text 的完整内容，包括链接文本。
+    如果指定 date_prefix，只提取该日期的消息。"""
+    raw = cdp_eval(ws, """(() => {
+        const DATE_PREFIX = __DATE_PREFIX__;
+        const bubbles = document.querySelectorAll('.bubble-item');
+        const msgs = [];
+        bubbles.forEach(b => {
+            // 时间
+            const timeEl = b.querySelector('.bubble-item-time');
+            const time = timeEl ? timeEl.textContent.trim() : '';
+
+            // 日期过滤
+            if (DATE_PREFIX && !time.startsWith(DATE_PREFIX)) return;
+
+            // 发送者
+            let sender = '';
+            const nickEl = b.querySelector('.nick-name');
+            if (nickEl) {
+                sender = nickEl.textContent.trim();
+            } else {
+                const senderEl = b.querySelector('.sender-name, .message-sender');
+                if (senderEl) {
+                    sender = senderEl.textContent.trim();
+                } else {
+                    // 大象机器人等：名字在 .person div 里，格式 "大象机器人03-11 09:22"
+                    const personEl = b.querySelector('.person');
+                    if (personEl) {
+                        let raw = personEl.textContent.trim();
+                        // 去掉末尾的时间部分 (MM-DD HH:MM 或 YYYY-MM-DD HH:MM)
+                        raw = raw.replace(/\\s*\\d{2,4}-\\d{2}(-\\d{2})?\\s+\\d{2}:\\d{2}\\s*$/, '').trim();
+                        sender = raw;
+                    }
+                }
+            }
+
+            // 消息文本 - 提取完整内容，包括链接
+            const msgEl = b.querySelector('.dx-message-text');
+            if (!msgEl) return;
+
+            // 遍历子节点，链接用 [文字|URL] 格式保留
+            let text = '';
+            const walk = (node) => {
+                if (node.nodeType === 3) {
+                    // 文本节点
+                    text += node.textContent;
+                } else if (node.tagName === 'BR') {
+                    text += '\\n';
+                } else if (node.tagName === 'A' && node.classList.contains('link')) {
+                    const linkText = node.textContent.trim();
+                    const href = node.getAttribute('href') || '';
+                    text += '[' + linkText + '|' + href + ']';
+                } else {
+                    // 递归处理其他元素
+                    for (const child of node.childNodes) {
+                        walk(child);
+                    }
+                }
+            };
+            for (const child of msgEl.childNodes) {
+                walk(child);
+            }
+            text = text.trim();
+            if (!text) return;
+
+            msgs.push({time, sender, text});
+        });
+        return msgs;
+    })()""".replace("__DATE_PREFIX__", json.dumps(date_prefix) if date_prefix else "null"))
+    return raw or []
+
+
+def _has_date_on_page(ws, date_prefix):
+    """检查页面上是否存在指定日期前缀的消息。
+    date_prefix 格式如 '03-11'。"""
+    return cdp_eval(ws, """(() => {
+        const PREFIX = __PREFIX__;
+        const times = document.querySelectorAll('.bubble-item .bubble-item-time');
+        for (const t of times) {
+            if (t.textContent.trim().startsWith(PREFIX)) return true;
+        }
+        return false;
+    })()""".replace("__PREFIX__", json.dumps(date_prefix)))
+
+
+def _get_earliest_date_on_page(ws):
+    """获取页面上最早的消息日期前缀（格式 MM-DD）"""
+    return cdp_eval(ws, """(() => {
+        const times = document.querySelectorAll('.bubble-item .bubble-item-time');
+        for (const t of times) {
+            const txt = t.textContent.trim();
+            if (/^\\d{2}-\\d{2}/.test(txt)) return txt.slice(0, 5);
+        }
+        return null;
+    })()""")
+
+
+def scroll_until_date(ws, target_date, max_scrolls=50, wait=2):
+    """向上滚动直到页面上出现目标日期的消息，或达到最大滚动次数。
+    target_date 格式如 '03-11'。
+    修复：找到目标日期后继续滚动，直到页面最早消息早于目标日期，确保加载完整一天。
+    返回是否找到。"""
+    found = False
+    for i in range(max_scrolls):
+        earliest = _get_earliest_date_on_page(ws)
+        if earliest is not None and earliest < target_date:
+            print(f"  第 {i+1} 次滚动后，页面最早日期 {earliest} < {target_date}，全天消息已加载完毕", file=sys.stderr)
+            return True
+        if _has_date_on_page(ws, target_date):
+            found = True
+            print(f"  第 {i+1} 次滚动后找到目标日期 {target_date}，继续滚动确保加载完整...", file=sys.stderr)
+        cdp_eval(ws, """(() => {
+            const container = document.querySelector('.bubble_list_message, [class*="bubble_list"]');
+            if (container) container.scrollTop = 0;
+            const loadMore = document.querySelector('[class*="load-more"], .load-history');
+            if (loadMore) loadMore.click();
+        })()""")
+        time.sleep(wait)
+    if found:
+        print(f"  达到最大滚动次数 {max_scrolls}，已找到目标日期但可能未加载完整", file=sys.stderr)
+    return found
+
+
+def scroll_to_load_more(ws, count=3, wait=2):
+    """向上滚动加载更多历史消息"""
+    for i in range(count):
+        cdp_eval(ws, """(() => {
+            const container = document.querySelector('.bubble_list_message, [class*="bubble_list"]');
+            if (container) container.scrollTop = 0;
+            const loadMore = document.querySelector('[class*="load-more"], .load-history');
+            if (loadMore) loadMore.click();
+        })()""")
+        time.sleep(wait)
+
+# ── 主入口 ───────────────────────────────────────────────────
+
+def main():
+    parser = argparse.ArgumentParser(description="读取大象群聊消息")
+    parser.add_argument("chat_url", help="大象群聊 URL")
+    parser.add_argument("--output", "-o", default="/tmp/dx_messages.json", help="输出文件路径")
+    parser.add_argument("--no-expand", action="store_true", help="不展开折叠消息")
+    parser.add_argument("--scroll", type=int, default=0, help="向上滚动次数（与 --date 互斥，--date 优先）")
+    parser.add_argument("--wait", type=int, default=6, help="页面加载等待秒数")
+    parser.add_argument("--no-navigate", action="store_true", help="跳过导航")
+    parser.add_argument("--date", type=str, default=None,
+                        help="目标日期前缀，如 '03-11'。只滚动到该日期，只展开和提取该日期的消息。"
+                             "支持逗号分隔多个日期如 '03-10,03-11'")
+    parser.add_argument("--max-scroll", type=int, default=50, help="--date 模式下最大滚动次数")
+    args = parser.parse_args()
+
+    # 解析日期
+    date_prefixes = None
+    if args.date:
+        date_prefixes = [d.strip() for d in args.date.split(",")]
+
+    # 连接浏览器
+    ws_url = _get_ws("x.sankuai.com")
+    need_nav = not args.no_navigate
+
+    if ws_url and not need_nav:
+        print(f"复用已有大象标签页", file=sys.stderr)
+    else:
+        tabs = _get_tabs()
+        if not tabs:
+            print("ERROR: 浏览器无标签页", file=sys.stderr)
+            sys.exit(1)
+        ws_url = tabs[0]["webSocketDebuggerUrl"]
+
+    ws = websocket.create_connection(ws_url)
+
+    if need_nav:
+        print(f"导航到 {args.chat_url} ...", file=sys.stderr)
+        navigate_to_chat(ws, args.chat_url, wait=args.wait)
+
+    # 滚动策略
+    if date_prefixes:
+        # 智能滚动：检查每个目标日期是否已在页面上
+        target = min(date_prefixes)  # 最早的日期
+        if _has_date_on_page(ws, target):
+            print(f"页面已包含目标日期 {target}，无需滚动", file=sys.stderr)
+        else:
+            print(f"向上滚动查找日期 {target}...", file=sys.stderr)
+            found = scroll_until_date(ws, target, max_scrolls=args.max_scroll)
+            if not found:
+                print(f"WARNING: 滚动 {args.max_scroll} 次后仍未找到 {target}", file=sys.stderr)
+    elif args.scroll > 0:
+        print(f"向上滚动 {args.scroll} 次...", file=sys.stderr)
+        scroll_to_load_more(ws, count=args.scroll)
+
+    # 展开折叠消息
+    if not args.no_expand:
+        if date_prefixes:
+            total_expanded = 0
+            for dp in date_prefixes:
+                print(f"展开 {dp} 的折叠消息...", file=sys.stderr)
+                n = expand_all_truncated(ws, date_prefix=dp)
+                total_expanded += n
+            print(f"共展开 {total_expanded} 条消息", file=sys.stderr)
+        else:
+            print("展开所有折叠消息...", file=sys.stderr)
+            n = expand_all_truncated(ws)
+            print(f"展开了 {n} 条消息", file=sys.stderr)
+
+    # 提取消息
+    print("提取消息...", file=sys.stderr)
+    if date_prefixes:
+        messages = []
+        for dp in date_prefixes:
+            msgs = extract_messages(ws, date_prefix=dp)
+            messages.extend(msgs)
+        # 去重（以 time+sender 为键）
+        seen = set()
+        unique = []
+        for m in messages:
+            key = (m["time"], m["sender"], m["text"][:50])
+            if key not in seen:
+                seen.add(key)
+                unique.append(m)
+        messages = unique
+    else:
+        messages = extract_messages(ws)
+
+    print(f"共 {len(messages)} 条消息", file=sys.stderr)
+
+    ws.close()
+
+    # 输出
+    with open(args.output, "w", encoding="utf-8") as f:
+        json.dump(messages, f, ensure_ascii=False, indent=2)
+    print(f"已保存到 {args.output}", file=sys.stderr)
+
+    # stdout
+    print(json.dumps(messages, ensure_ascii=False, indent=2))
+
+if __name__ == "__main__":
+    main()

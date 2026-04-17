@@ -1,0 +1,534 @@
+#!/usr/bin/env python3
+"""Fetch recent tweets from key AI people via Nitter RSS with Catclaw search fallback.
+
+Optimized version:
+- Nitter instance pre-check (parallel, 5s timeout)
+- Concurrent account fetching via ThreadPoolExecutor
+- Global timeout control (120s max)
+- Reduced per-request timeouts
+"""
+
+import json
+import ssl
+import sys
+import os
+import re
+import time
+from datetime import datetime, timedelta, timezone
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import urllib.request
+import urllib.error
+import xml.etree.ElementTree as ET
+
+# === TRACKED ACCOUNTS (70 accounts) ===
+ACCOUNTS = [
+    # --- AI Company Leaders ---
+    ("sama", "leaders", "Sam Altman - OpenAI CEO"),
+    ("DarioAmodei", "leaders", "Dario Amodei - Anthropic CEO"),
+    ("ylecun", "leaders", "Yann LeCun - Meta Chief AI Scientist"),
+    ("AndrewYNg", "leaders", "Andrew Ng - AI Fund / DeepLearning.AI"),
+    ("JeffDean", "leaders", "Jeff Dean - Google DeepMind"),
+    ("demis_hassabis", "leaders", "Demis Hassabis - Google DeepMind CEO"),
+    ("satyanadella", "leaders", "Satya Nadella - Microsoft CEO"),
+    ("AravSrinivas", "leaders", "Arav Srinivas - Perplexity CEO"),
+    ("mustafasuleyman", "leaders", "Mustafa Suleyman - Microsoft AI CEO"),
+
+    # --- Top Researchers ---
+    ("karpathy", "researchers", "Andrej Karpathy - 前 Tesla AI / 独立"),
+    ("DrJimFan", "researchers", "Jim Fan - NVIDIA 研究"),
+    ("fchollet", "researchers", "François Chollet - Keras / ARC"),
+    ("ilyasut", "researchers", "Ilya Sutskever - SSI"),
+    ("jackclarkSF", "researchers", "Jack Clark - Anthropic 联合创始人"),
+    ("woj_zaremba", "researchers", "Wojciech Zaremba - OpenAI 联合创始人"),
+    ("tri_dao", "researchers", "Tri Dao - FlashAttention 作者"),
+    ("Tim_Dettmers", "researchers", "Tim Dettmers - 量化/高效训练"),
+
+    # --- AI Coding ---
+    ("cursor_ai", "coding", "Cursor - AI Code Editor"),
+    ("windsurf_ai", "coding", "Windsurf - AI Coding"),
+    ("cognition_labs", "coding", "Cognition - Devin AI Engineer"),
+    ("OpenClawAI", "coding", "OpenClaw - AI Agent Platform"),
+    ("Replit", "coding", "Replit - AI Coding Platform"),
+    ("cline_ai", "coding", "Cline - AI Coding Extension"),
+    ("sourcegraph", "coding", "Sourcegraph - Code AI"),
+    ("GitHubCopilot", "coding", "GitHub Copilot"),
+    ("vercel", "coding", "Vercel - v0 AI"),
+    ("stackblitz", "coding", "StackBlitz - bolt.new"),
+    ("AnthropicAI", "coding", "Anthropic (Claude Code 相关)"),
+
+    # --- AI Commentators / Podcasters ---
+    ("simonw", "commentators", "Simon Willison - LLM 应用专家"),
+    ("swyx", "commentators", "Swyx - AI Engineering / Latent Space"),
+    ("lexfridman", "commentators", "Lex Fridman - 播客"),
+    ("dwarkesh_sp", "commentators", "Dwarkesh Patel - 深度播客"),
+    ("emollick", "commentators", "Ethan Mollick - AI 应用/商业"),
+    ("TheAIGRID", "commentators", "The AI Grid - AI 新闻"),
+    ("mattshumer_", "commentators", "Matt Shumer - AI Builder"),
+    ("bindureddy", "commentators", "Bindu Reddy - AI CEO/评论"),
+    ("_jasonwei", "commentators", "Jason Wei - OpenAI 研究员"),
+    ("RichardSocher", "commentators", "Richard Socher - you.com"),
+
+    # --- OpenAI Researchers ---
+    ("lilianweng", "researchers", "Lilian Weng - 前 OpenAI VP, Thinking Machines Lab 联创, 顶级 AI 技术博主"),
+    ("polynoamial", "researchers", "Noam Brown - OpenAI 研究员, o1 模型核心, 推理/规划领域顶尖"),
+    ("gdb", "leaders", "Greg Brockman - OpenAI 联合创始人兼总裁"),
+    ("miramurati", "researchers", "Mira Murati - 前 OpenAI CTO, ChatGPT 核心推动者"),
+    ("SebastienBubeck", "researchers", "Sebastien Bubeck - OpenAI 研究员, 前微软杰出科学家, 深度学习理论"),
+    ("npew", "researchers", "Peter Welinder - OpenAI 产品副总裁"),
+    ("joannejang", "researchers", "Joanne Jang - OpenAI 模型行为负责人"),
+    ("romainhuet", "researchers", "Romain Huet - OpenAI 开发者体验主管"),
+
+    # --- Anthropic Researchers ---
+    ("AmandaAskell", "researchers", "Amanda Askell - Anthropic Character 团队负责人, Claude 性格设计师"),
+    ("ch402", "researchers", "Chris Olah - Anthropic 联合创始人, 可解释性研究开创者"),
+    ("janleike", "researchers", "Jan Leike - Anthropic 对齐研究负责人, 前 OpenAI 超级对齐核心"),
+    ("alexalbert__", "researchers", "Alex Albert - Anthropic 开发者关系负责人"),
+    ("_sholtodouglas", "researchers", "Sholto Douglas - Anthropic 研究员, 前 DeepMind"),
+
+    # --- Google DeepMind Researchers ---
+    ("OriolVinyalsML", "researchers", "Oriol Vinyals - DeepMind 研究副总裁, Gemini 联席负责人"),
+    ("goodfellow_ian", "researchers", "Ian Goodfellow - DeepMind, GANs 之父"),
+    ("OfficialLoganK", "researchers", "Logan Kilpatrick - Google DeepMind 产品, 前 OpenAI 开发者关系"),
+    ("ShaneLegg", "researchers", "Shane Legg - DeepMind 联合创始人, 首席 AGI 科学家"),
+
+    # --- Meta AI / 独立 ---
+    ("soumithchintala", "researchers", "Soumith Chintala - Meta AI, PyTorch 之父"),
+    ("geoffreyhinton", "researchers", "Geoffrey Hinton - 图灵奖/诺贝尔奖, 深度学习之父"),
+    ("drfeifei", "researchers", "Fei-Fei Li (李飞飞) - 斯坦福教授, ImageNet 创建者, AI 教母"),
+
+    # --- AI 大 V / 意见领袖 ---
+    ("_akhaliq", "commentators", "AK - Hugging Face, 全球最快 AI 论文速递"),
+    ("ClementDelangue", "commentators", "Clem Delangue - Hugging Face CEO, 开源 AI 领军"),
+    ("rasbt", "commentators", "Sebastian Raschka - Ahead of AI newsletter, LLM 技术内容"),
+    ("nathanlambert", "commentators", "Nathan Lambert - AI2 研究员, RLHF 专家, Interconnects newsletter"),
+    ("goodside", "commentators", "Riley Goodside - Scale AI 首席提示工程师, Prompt 工程宗师"),
+    ("dylan522p", "commentators", "Dylan Patel - SemiAnalysis, AI 芯片/算力最权威分析师"),
+    ("kaifulee", "commentators", "李开复 - 01.AI CEO, 创新工场, 中美 AI 双重视角"),
+
+    # --- AI Coding 意见领袖 ---
+    ("steipete", "coding", "Peter Steinberger - OpenAI (前 OpenClaw 创始人), AI Agent 实践者"),
+    ("levelsio", "coding", "Pieter Levels - 独立开发者, vibe coding 先驱, 年入数百万"),
+    ("mckaywrigley", "coding", "Mckay Wrigley - Takeoff AI, AI 编程实战教程第一人"),
+    ("mntruell", "coding", "Michael Truell - Cursor CEO, AI 代码编辑器赛道领军"),
+
+    # --- OpenClaw Ecosystem ---
+    ("OpenClawAI", "openclaw", "OpenClaw Official"),
+    ("nickscamara_", "openclaw", "Nick Scamara - OpenClaw"),
+]
+
+# Core accounts: always run Catclaw as supplement even when Nitter succeeds
+CORE_ACCOUNTS = {
+    "sama", "DarioAmodei", "karpathy", "ylecun", "JeffDean", "demis_hassabis",
+    "ilyasut", "DrJimFan", "gdb", "miramurati", "fchollet", "jackclarkSF",
+    "satyanadella", "mustafasuleyman", "geoffreyhinton", "drfeifei",
+    "simonw", "swyx", "emollick",
+}
+
+# Deduplicate
+seen = set()
+UNIQUE_ACCOUNTS = []
+for handle, cat, desc in ACCOUNTS:
+    if handle not in seen:
+        seen.add(handle)
+        UNIQUE_ACCOUNTS.append((handle, cat, desc))
+
+NITTER_INSTANCES = [
+    # 2026-03-18: 所有公共实例均已失效（OAuth墙/403/无响应），强制走catclaw fallback
+    # "https://nitter.projectsegfau.lt",  # 已加OAuth认证墙
+    # "https://nitter.poast.org",  # 403
+    # "https://nitter.woodland.cafe",  # 无响应
+    # "https://nitter.net",  # 302重定向，无法返回RSS
+    # "https://nitter.cz",  # 无响应
+]
+
+PROXY = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")
+
+# Category display order for output
+CATEGORY_ORDER = ["leaders", "researchers", "coding", "commentators", "openclaw"]
+CATEGORY_LABELS = {
+    "leaders": "🏢 AI 公司领袖",
+    "researchers": "🔬 顶级研究员",
+    "coding": "💻 AI Coding",
+    "commentators": "🎙️ 评论员 / 意见领袖",
+    "openclaw": "🐾 OpenClaw 生态",
+}
+
+# === PERFORMANCE TUNING ===
+NITTER_TIMEOUT = 6          # seconds per Nitter request (was 15)
+NITTER_PRECHECK_TIMEOUT = 4 # seconds for instance health check
+CATCLAW_TIMEOUT = 12        # seconds per Catclaw search
+MAX_WORKERS_NITTER = 15     # parallel account fetches for Nitter
+MAX_WORKERS_CATCLAW = 10    # parallel Catclaw fallback fetches
+GLOBAL_TIMEOUT = 120        # seconds total for all fetching
+
+
+def build_opener():
+    if PROXY:
+        return urllib.request.build_opener(
+            urllib.request.ProxyHandler({"http": PROXY, "https": PROXY})
+        )
+    return urllib.request.build_opener()
+
+
+def precheck_nitter_instances():
+    """Check which Nitter instances are alive (parallel). Returns list of working ones."""
+    alive = []
+
+    def check_instance(instance):
+        """Try fetching a known account's RSS to verify the instance works."""
+        url = f"{instance}/sama/rss"
+        try:
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "Mozilla/5.0 (compatible; AITrendBot/1.0)"
+            })
+            opener = build_opener()
+            resp = opener.open(req, timeout=NITTER_PRECHECK_TIMEOUT)
+            if resp.status == 200:
+                data = resp.read()
+                if b"<item>" in data or b"<rss" in data:
+                    return instance
+        except Exception:
+            pass
+        return None
+
+    with ThreadPoolExecutor(max_workers=max(1, len(NITTER_INSTANCES))) as pool:
+        futures = {pool.submit(check_instance, inst): inst for inst in NITTER_INSTANCES}
+        for future in as_completed(futures, timeout=NITTER_PRECHECK_TIMEOUT + 2):
+            try:
+                result = future.result()
+                if result:
+                    alive.append(result)
+            except Exception:
+                pass
+
+    return alive
+
+
+def fetch_nitter_rss(account, opener, live_instances):
+    """Try each live Nitter instance for RSS feed."""
+    for instance in live_instances:
+        url = f"{instance}/{account}/rss"
+        try:
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "Mozilla/5.0 (compatible; AITrendBot/1.0)"
+            })
+            resp = opener.open(req, timeout=NITTER_TIMEOUT)
+            if resp.status == 200:
+                return resp.read().decode("utf-8"), instance
+        except Exception:
+            continue
+    return None, None
+
+
+def search_catclaw(query, num=10, engine="google-search"):
+    """Search via Catclaw universal-search API."""
+    payload = {
+        "query": query,
+        "sources": [engine],
+        "topK": num,
+        "isFast": True,
+        "timeout": CATCLAW_TIMEOUT,
+    }
+    data = json.dumps(payload).encode()
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    req = urllib.request.Request(
+        "https://mmc.sankuai.com/openclaw/v1/universal-search",
+        data=data,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        resp = urllib.request.urlopen(req, timeout=CATCLAW_TIMEOUT, context=ctx)
+        result = json.loads(resp.read())
+        return result.get("data", {}).get("results", [])
+    except Exception:
+        return []
+
+
+def fetch_via_catclaw(handle, description, hours=24):
+    """Fetch recent tweets via Catclaw search."""
+    yesterday = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%d")
+    tweets = []
+
+    queries = [
+        f'from:{handle} site:x.com since:{yesterday}',
+        f'"{handle}" site:x.com',
+        f'@{handle} site:twitter.com',
+    ]
+
+    for query in queries:
+        results = search_catclaw(query, num=5)
+        if results:
+            for r in results:
+                url = r.get("url", "")
+                title = r.get("title", "")
+                snippet = r.get("snippet", r.get("content", ""))
+                if "x.com" in url or "twitter.com" in url:
+                    tweets.append({
+                        "title": title[:300],
+                        "text": snippet[:800] if snippet else title[:800],
+                        "link": url,
+                        "date": r.get("publishedDate", r.get("date", "")),
+                        "source": "catclaw",
+                    })
+            if tweets:
+                break
+    return tweets
+
+
+def parse_rss(xml_text, account, category, description, hours=24):
+    """Parse RSS feed and filter to recent hours only."""
+    tweets = []
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    try:
+        root = ET.fromstring(xml_text)
+        for item in root.findall(".//item"):
+            title = item.findtext("title", "")
+            link = item.findtext("link", "")
+            pub_date = item.findtext("pubDate", "")
+            desc_html = item.findtext("description", "")
+            clean_desc = re.sub(r"<[^>]+>", "", desc_html).strip()
+            if pub_date:
+                try:
+                    from email.utils import parsedate_to_datetime
+                    tweet_time = parsedate_to_datetime(pub_date)
+                    if tweet_time < cutoff:
+                        continue
+                except Exception:
+                    pass
+            tweets.append({
+                "account": account,
+                "category": category,
+                "who": description,
+                "title": title[:300],
+                "text": clean_desc[:800],
+                "link": link,
+                "date": pub_date,
+                "source": "nitter",
+            })
+    except ET.ParseError:
+        pass
+    return tweets
+
+
+def fetch_single_account(handle, cat, desc, opener, live_instances, hours, max_per_account):
+    """Fetch tweets for a single account (Nitter + optional Catclaw). Returns (tweets, stats)."""
+    is_core = handle in CORE_ACCOUNTS
+    result_tweets = []
+    stats = {"nitter_ok": 0, "nitter_fail": 0, "catclaw_ok": 0, "catclaw_fail": 0, "error": False}
+    nitter_tweets = []
+
+    # Try Nitter RSS first (only if we have live instances)
+    if live_instances:
+        data, instance = fetch_nitter_rss(handle, opener, live_instances)
+        if data:
+            nitter_tweets = parse_rss(data, handle, cat, desc, hours=hours)
+            for t in nitter_tweets[:max_per_account]:
+                result_tweets.append(t)
+            stats["nitter_ok"] = 1
+
+            # Core accounts: also run Catclaw supplement
+            if is_core:
+                catclaw_tweets = fetch_via_catclaw(handle, desc, hours=hours)
+                if catclaw_tweets:
+                    existing_links = {t.get("link", "") for t in nitter_tweets}
+                    for t in catclaw_tweets[:max_per_account]:
+                        if t.get("link", "") not in existing_links:
+                            t["account"] = handle
+                            t["category"] = cat
+                            t["who"] = desc
+                            t["source"] = "catclaw-supplement"
+                            result_tweets.append(t)
+                    stats["catclaw_ok"] = 1
+            return result_tweets, stats
+        else:
+            stats["nitter_fail"] = 1
+
+    # Nitter failed or no live instances -> Catclaw fallback
+    if not live_instances:
+        stats["nitter_fail"] = 1
+
+    catclaw_tweets = fetch_via_catclaw(handle, desc, hours=hours)
+    if catclaw_tweets:
+        stats["catclaw_ok"] = 1
+        for t in catclaw_tweets[:max_per_account]:
+            t["account"] = handle
+            t["category"] = cat
+            t["who"] = desc
+            result_tweets.append(t)
+    else:
+        stats["catclaw_fail"] = 1
+        stats["error"] = True
+
+    return result_tweets, stats
+
+
+def fetch_all(hours=24, max_per_account=10):
+    """Fetch tweets from all accounts with concurrency and global timeout."""
+    global_start = time.time()
+    opener = build_opener()
+    all_tweets = []
+    errors = []
+    nitter_ok = 0
+    nitter_fail = 0
+    catclaw_ok = 0
+    catclaw_fail = 0
+
+    print(f"[fetch_x] Scanning {len(UNIQUE_ACCOUNTS)} accounts (last {hours}h)...", file=sys.stderr)
+
+    # Phase 1: Pre-check Nitter instances (parallel, ~5s)
+    print("[fetch_x] Pre-checking Nitter instances...", file=sys.stderr)
+    precheck_start = time.time()
+    live_instances = precheck_nitter_instances()
+    precheck_time = time.time() - precheck_start
+    if live_instances:
+        print(f"[fetch_x] {len(live_instances)} alive Nitter instances ({precheck_time:.1f}s): {live_instances}", file=sys.stderr)
+    else:
+        print(f"[fetch_x] No Nitter instances alive ({precheck_time:.1f}s). Using Catclaw only.", file=sys.stderr)
+
+    # Phase 2: Fetch all accounts concurrently
+    # Split into core accounts first, then the rest
+    core_list = [(h, c, d) for h, c, d in UNIQUE_ACCOUNTS if h in CORE_ACCOUNTS]
+    other_list = [(h, c, d) for h, c, d in UNIQUE_ACCOUNTS if h not in CORE_ACCOUNTS]
+    ordered_accounts = core_list + other_list
+
+    # Determine concurrency
+    workers = MAX_WORKERS_CATCLAW if not live_instances else MAX_WORKERS_NITTER
+
+    fetch_start = time.time()
+    completed = 0
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        future_map = {}
+        for handle, cat, desc in ordered_accounts:
+            # Check global timeout before submitting
+            if time.time() - global_start > GLOBAL_TIMEOUT - 5:
+                print(f"[fetch_x] Global timeout approaching, skipping remaining accounts.", file=sys.stderr)
+                break
+            f = pool.submit(fetch_single_account, handle, cat, desc, opener, live_instances, hours, max_per_account)
+            future_map[f] = handle
+
+        remaining_time = max(GLOBAL_TIMEOUT - (time.time() - global_start), 10)
+        for future in as_completed(future_map, timeout=remaining_time):
+            handle = future_map[future]
+            try:
+                tweets, stats = future.result(timeout=5)
+                all_tweets.extend(tweets)
+                nitter_ok += stats["nitter_ok"]
+                nitter_fail += stats["nitter_fail"]
+                catclaw_ok += stats["catclaw_ok"]
+                catclaw_fail += stats["catclaw_fail"]
+                if stats["error"]:
+                    errors.append(handle)
+
+                completed += 1
+                src = "nitter" if stats["nitter_ok"] else ("catclaw" if stats["catclaw_ok"] else "failed")
+                tweet_count = len(tweets)
+                if tweet_count > 0:
+                    print(f"  ✓ @{handle}: {tweet_count} tweets ({src})", file=sys.stderr)
+                elif not stats["error"]:
+                    print(f"  · @{handle}: 0 recent ({src})", file=sys.stderr)
+                else:
+                    print(f"  ✗ @{handle}: failed", file=sys.stderr)
+
+            except Exception as e:
+                errors.append(handle)
+                nitter_fail += 1
+                catclaw_fail += 1
+                print(f"  ✗ @{handle}: exception ({e})", file=sys.stderr)
+
+    fetch_time = time.time() - fetch_start
+    total_time = time.time() - global_start
+
+    # Group by category
+    by_category = defaultdict(list)
+    for t in all_tweets:
+        by_category[t["category"]].append(t)
+
+    print(f"\n[fetch_x] Done in {total_time:.1f}s (precheck: {precheck_time:.1f}s, fetch: {fetch_time:.1f}s).", file=sys.stderr)
+    print(f"[fetch_x] Completed {completed}/{len(ordered_accounts)} accounts.", file=sys.stderr)
+    print(f"[fetch_x] Nitter: {nitter_ok}✓/{nitter_fail}✗ | "
+          f"Catclaw: {catclaw_ok}✓/{catclaw_fail}✗ | "
+          f"Total tweets: {len(all_tweets)}", file=sys.stderr)
+
+    return {
+        "tweets": all_tweets,
+        "by_category": {k: v for k, v in by_category.items()},
+        "category_counts": {k: len(v) for k, v in by_category.items()},
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "hours": hours,
+        "total": len(all_tweets),
+        "accounts_tracked": len(UNIQUE_ACCOUNTS),
+        "nitter_ok": nitter_ok,
+        "nitter_fail": nitter_fail,
+        "catclaw_ok": catclaw_ok,
+        "catclaw_fail": catclaw_fail,
+        "errors": errors,
+        "elapsed_seconds": round(total_time, 1),
+    }
+
+
+def format_categorized_output(result):
+    """Format output grouped by category, matching monthly report style."""
+    lines = []
+    lines.append(f"# X/Twitter AI 动态 — 最近 {result['hours']} 小时")
+    lines.append("")
+    lines.append(f"**采集时间**: {result['fetched_at']}")
+    lines.append(f"**追踪账号数**: {result['accounts_tracked']} (去重后)")
+    lines.append(f"**获取推文数**: {result['total']}")
+    lines.append(f"**耗时**: {result.get('elapsed_seconds', '?')}s")
+    lines.append(f"**数据源**: Nitter RSS {result['nitter_ok']}✓/{result['nitter_fail']}✗"
+                 f" | Catclaw {result['catclaw_ok']}✓/{result['catclaw_fail']}✗")
+    if result["errors"]:
+        lines.append(f"**失败账号**: {', '.join(result['errors'][:20])}")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+
+    by_category = result.get("by_category", {})
+
+    for cat_key in CATEGORY_ORDER:
+        tweets = by_category.get(cat_key, [])
+        if not tweets:
+            continue
+        label = CATEGORY_LABELS.get(cat_key, cat_key)
+        lines.append(f"## {label}")
+        lines.append("")
+
+        by_account = defaultdict(list)
+        for t in tweets:
+            by_account[t["account"]].append(t)
+
+        for account, account_tweets in by_account.items():
+            who = account_tweets[0].get("who", account)
+            lines.append(f"### @{account} ({who})")
+            for t in account_tweets:
+                date_str = t.get("date", "")
+                link = t.get("link", "")
+                text = t.get("text", t.get("title", ""))
+                if text:
+                    display_text = text[:500] + "..." if len(text) > 500 else text
+                    lines.append(f"- {display_text}")
+                if link:
+                    lines.append(f"  来源: [{link}]({link})")
+                if date_str:
+                    lines.append(f"  日期: {date_str}")
+                lines.append("")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+if __name__ == "__main__":
+    hours = int(sys.argv[1]) if len(sys.argv) > 1 else 24
+    output_format = sys.argv[2] if len(sys.argv) > 2 else "json"
+
+    result = fetch_all(hours=hours)
+
+    if output_format == "md" or output_format == "markdown":
+        print(format_categorized_output(result))
+    else:
+        output = {k: v for k, v in result.items() if k != "by_category"}
+        print(json.dumps(output, ensure_ascii=False, indent=2))

@@ -1,0 +1,4 @@
+interface:
+  display_name: "TCX CI/CD 查询"
+  short_description: "只读查询美团研发服务、流水线、模板与发布上下文信息"
+  default_prompt: "使用 tcx 只读查询美团研发 CI/CD 信息，优先通过 list-services、cargo、plus、fe-deploy 收敛 service-name、appkey、stack_uuid、cargo_url、release-id、template-id、swimlane 等标识；若用户要实际构建或部署，则转交执行型 skill。"

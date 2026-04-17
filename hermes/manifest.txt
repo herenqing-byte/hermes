@@ -1,0 +1,21 @@
+Generated: 2026-04-17 18:38:33 CST
+Source: /Users/herenqing/.hermes
+Included:
+- config/config.yaml
+- config/SOUL.md
+- config/cron-jobs.json
+- config/channel_directory.json
+- config/processes.json
+- config/skills_prompt_snapshot.json
+- config/skills.bundled_manifest
+- config/skills-hub/
+- hooks/
+- plugins/
+- scripts/
+- memories/
+- skills/
+- patches/hermes-agent.local.patch
+Excluded:
+- .env / auth.json / API keys / tokens
+- logs/ cache/ sessions/ databases/ pid files
+- hermes-agent working tree itself (tracked via patch instead)

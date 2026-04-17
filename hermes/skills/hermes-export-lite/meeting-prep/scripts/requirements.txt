@@ -1,0 +1,5 @@
+# 无额外依赖
+# 全部使用 Python 标准库 + 系统已有工具：
+#   mtcal      — 美团日历 CLI
+#   oa-skills citadel — 学城文档读取
+#   /root/.openclaw/workspace/research/tools/vector_index.py — 向量搜索（已内置）
