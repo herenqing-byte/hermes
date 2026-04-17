@@ -29,6 +29,7 @@ copy_dir() {
   if [[ -d "$src" ]]; then
     rsync -a --delete \
       --exclude '.DS_Store' \
+      --exclude '.git/' \
       --exclude '*.pyc' \
       --exclude '__pycache__/' \
       "$src/" "$dest/"
