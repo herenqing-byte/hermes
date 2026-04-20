@@ -1,3 +1,4 @@
+ M agent/model_metadata.py
  M agent/prompt_builder.py
  M cron/scheduler.py
  M gateway/config.py

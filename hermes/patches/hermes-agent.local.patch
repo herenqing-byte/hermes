@@ -1,3 +1,23 @@
+diff --git a/agent/model_metadata.py b/agent/model_metadata.py
+index 3b500664..1c5b6fca 100644
+--- a/agent/model_metadata.py
++++ b/agent/model_metadata.py
+@@ -218,6 +218,7 @@ _URL_TO_PROVIDER: Dict[str, str] = {
+     "api.openai.com": "openai",
+     "chatgpt.com": "openai",
+     "api.anthropic.com": "anthropic",
++    "gaccode.com": "anthropic",
+     "api.z.ai": "zai",
+     "api.moonshot.ai": "kimi-coding",
+     "api.moonshot.cn": "kimi-coding-cn",
+@@ -1001,6 +1002,7 @@ def get_model_context_length(
+                 "in config.yaml to override.",
+                 model, base_url, f"{DEFAULT_FALLBACK_CONTEXT:,}",
+             )
++            save_context_length(model, base_url, DEFAULT_FALLBACK_CONTEXT)
+             return DEFAULT_FALLBACK_CONTEXT
+ 
+     # 4. Anthropic /v1/models API (only for regular API keys, not OAuth)
 diff --git a/agent/prompt_builder.py b/agent/prompt_builder.py
 index c61d6995..6078b385 100644
 --- a/agent/prompt_builder.py
@@ -140,7 +160,7 @@ index 7ce105f3..66b4ca21 100644
      bluebubbles_server_url = os.getenv("BLUEBUBBLES_SERVER_URL")
      bluebubbles_password = os.getenv("BLUEBUBBLES_PASSWORD")
 diff --git a/gateway/platforms/base.py b/gateway/platforms/base.py
-index f7943da4..e28c893c 100644
+index f7943da4..682bdd51 100644
 --- a/gateway/platforms/base.py
 +++ b/gateway/platforms/base.py
 @@ -20,6 +20,15 @@ from urllib.parse import urlsplit
@@ -167,7 +187,35 @@ index f7943da4..e28c893c 100644
                          await self._send_with_retry(
                              chat_id=event.source.chat_id,
                              content=response,
-@@ -1635,6 +1645,7 @@ class BasePlatformAdapter(ABC):
+@@ -1617,8 +1627,25 @@ class BasePlatformAdapter(ABC):
+         try:
+             await self._run_processing_hook("on_processing_start", event)
+ 
+-            # Call the handler (this can take a while with tool calls)
+-            response = await self._message_handler(event)
++            # Call the handler (this can take a while with tool calls).
++            # Some platform/provider combinations can hang silently and leave
++            # the user with no reply at all. Put a bounded timeout around the
++            # end-to-end handler so we fail closed with a user-visible message
++            # instead of radio silence.
++            _handler_timeout = 0.0
++            try:
++                _timeout_env = os.getenv("HERMES_MESSAGE_HANDLER_TIMEOUT", "").strip()
++                if _timeout_env:
++                    _handler_timeout = max(float(_timeout_env), 0.0)
++                elif getattr(self.platform, "value", "") == "daxiang":
++                    _handler_timeout = 120.0
++            except Exception:
++                _handler_timeout = 0.0
++
++            if _handler_timeout > 0:
++                response = await asyncio.wait_for(self._message_handler(event), timeout=_handler_timeout)
++            else:
++                response = await self._message_handler(event)
+             
+             # Send response if any.  A None/empty response is normal when
+             # streaming already delivered the text (already_sent=True) or
+@@ -1635,6 +1662,7 @@ class BasePlatformAdapter(ABC):
                  # Strip any remaining internal directives from message body (fixes #1561)
                  text_content = text_content.replace("[[audio_as_voice]]", "").strip()
                  text_content = re.sub(r"MEDIA:\s*\S+", "", text_content).strip()
@@ -175,6 +223,39 @@ index f7943da4..e28c893c 100644
                  if images:
                      logger.info("[%s] extract_images found %d image(s) in response (%d chars)", self.name, len(images), len(response))
  
+@@ -1833,17 +1861,23 @@ class BasePlatformAdapter(ABC):
+                 error_type = type(e).__name__
+                 error_detail = str(e)[:300] if str(e) else "no details available"
+                 _thread_metadata = {"thread_id": event.source.thread_id} if event.source.thread_id else None
+-                await self.send(
+-                    chat_id=event.source.chat_id,
+-                    content=(
+-                        f"Sorry, I encountered an error ({error_type}).\n"
+-                        f"{error_detail}\n"
+-                        "Try again or use /reset to start a fresh session."
+-                    ),
+-                    metadata=_thread_metadata,
++                _error_message = (
++                    f"Sorry, I encountered an error ({error_type}).\n"
++                    f"{error_detail}\n"
++                    "Try again or use /reset to start a fresh session."
++                )
++                logger.info("[%s] Sending fallback error message to %s", self.name, event.source.chat_id)
++                _send_result = await asyncio.shield(
++                    self.send(
++                        chat_id=event.source.chat_id,
++                        content=_error_message,
++                        metadata=_thread_metadata,
++                    )
+                 )
++                if _send_result and not _send_result.success:
++                    logger.error("[%s] Fallback error message send failed: %s", self.name, _send_result.error)
+             except Exception:
+-                pass  # Last resort — don't let error reporting crash the handler
++                logger.exception("[%s] Failed to deliver fallback error message", self.name)
+         finally:
+             # Stop typing indicator
+             typing_task.cancel()
 diff --git a/gateway/run.py b/gateway/run.py
 index c8c25256..81000462 100644
 --- a/gateway/run.py

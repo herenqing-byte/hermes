@@ -93,21 +93,21 @@
       "schedule_display": "every 360m",
       "repeat": {
         "times": null,
-        "completed": 12
+        "completed": 14
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-17T10:09:37.109163+08:00",
-      "next_run_at": "2026-04-20T11:47:56.367144+08:00",
-      "last_run_at": "2026-04-20T05:47:56.367144+08:00",
+      "next_run_at": "2026-04-21T07:17:57.968440+08:00",
+      "last_run_at": "2026-04-21T01:17:57.968440+08:00",
       "last_status": "ok",
       "last_error": null,
-      "last_delivery_error": null,
+      "last_delivery_error": "delivery error: DaXiang send failed: DaXiang API request failed: \u53d1\u9001\u5361\u7247\u6d88\u606f\u5931\u8d25\uff0c\u9519\u8bef\u7801: 1000102",
       "deliver": "daxiang:mis:138541879692",
       "origin": null
     }
   ],
-  "updated_at": "2026-04-20T06:36:46.933412+08:00"
+  "updated_at": "2026-04-21T01:17:57.968675+08:00"
 }

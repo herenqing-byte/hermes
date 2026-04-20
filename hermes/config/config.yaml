@@ -154,11 +154,11 @@ display:
   busy_input_mode: interrupt
   bell_on_complete: false
   show_reasoning: false
-  streaming: true
+  streaming: false
   inline_diffs: true
   show_cost: false
   skin: default
-  interim_assistant_messages: true
+  interim_assistant_messages: false
   tool_progress_command: false
   tool_progress_overrides: {}
   tool_preview_length: 0
@@ -298,6 +298,9 @@ custom_providers:
   api_key: ''
   key_env: GAC_ANTHROPIC_API_KEY
   api_mode: anthropic_messages
+  models:
+    claude-sonnet-4-6:
+      context_length: 1000000
 - name: minimax
   base_url: https://api.minimaxi.com/anthropic
   api_key: ''
