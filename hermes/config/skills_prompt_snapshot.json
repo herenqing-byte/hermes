@@ -513,6 +513,10 @@
       1776144821320442667,
       7309
     ],
+    "web-content-fetcher/SKILL.md": [
+      1776418720343280875,
+      3865
+    ],
     "apple/DESCRIPTION.md": [
       1776144821237861664,
       152
@@ -2304,6 +2308,19 @@
       "category": "software-development",
       "frontmatter_name": "writing-plans",
       "description": "Use when you have a spec or requirements for a multi-step...",
+      "platforms": [],
+      "conditions": {
+        "fallback_for_toolsets": [],
+        "requires_toolsets": [],
+        "fallback_for_tools": [],
+        "requires_tools": []
+      }
+    },
+    {
+      "skill_name": "web-content-fetcher",
+      "category": "web-content-fetcher",
+      "frontmatter_name": "web-content-fetcher",
+      "description": "Extract article content from any URL as clean Markdown. U...",
       "platforms": [],
       "conditions": {
         "fallback_for_toolsets": [],
