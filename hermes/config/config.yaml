@@ -1,6 +1,6 @@
 model:
-  default: claude-sonnet-4-6
-  provider: gac_anthropic
+  default: gpt-5.4
+  provider: gac_codex
 providers: {}
 fallback_providers: []
 credential_pool_strategies: {}

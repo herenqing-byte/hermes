@@ -3,6 +3,7 @@
  M cron/scheduler.py
  M gateway/config.py
  M gateway/platforms/base.py
+ M gateway/platforms/weixin.py
  M gateway/run.py
  M gateway/stream_consumer.py
  M hermes_cli/config.py
@@ -14,3 +15,4 @@
  M tools/send_message_tool.py
  M toolsets.py
 ?? gateway/platforms/daxiang.py
+?? tests/gateway/test_daxiang.py

@@ -160,14 +160,47 @@ index 7ce105f3..66b4ca21 100644
      bluebubbles_server_url = os.getenv("BLUEBUBBLES_SERVER_URL")
      bluebubbles_password = os.getenv("BLUEBUBBLES_PASSWORD")
 diff --git a/gateway/platforms/base.py b/gateway/platforms/base.py
-index f7943da4..682bdd51 100644
+index f7943da4..7c9b7c22 100644
 --- a/gateway/platforms/base.py
 +++ b/gateway/platforms/base.py
-@@ -20,6 +20,15 @@ from urllib.parse import urlsplit
+@@ -20,6 +20,48 @@ from urllib.parse import urlsplit
  
  logger = logging.getLogger(__name__)
  
 +_TRAILING_DISPLAY_BLOCK_RE = re.compile(r'(?:\s*[▉█■□▪◼◾⬛⬜]+\s*)+$')
++
++
++def _format_user_visible_error(exc: Exception) -> str:
++    """Return a concise, human-readable fallback error for chat platforms."""
++    error_type = type(exc).__name__
++    detail = (str(exc) or "").strip()
++    detail_lower = detail.lower()
++
++    if "insufficient credits" in detail_lower or "http 402" in detail_lower:
++        return (
++            "当前不是消息通道挂了，而是上游模型供应商额度不足，"
++            "这次任务没跑完。\n"
++            f"原始错误: {error_type} (provider credits exhausted)"
++        )
++
++    if "invalid x-api-key" in detail_lower or ("http 401" in detail_lower and "anthropic" in detail_lower):
++        return (
++            "当前不是消息通道挂了，而是 Anthropic 凭证无效或已失效。\n"
++            f"原始错误: {error_type} (invalid provider credential)"
++        )
++
++    if "400 bad request" in detail_lower and "nginx" in detail_lower:
++        return (
++            "上游自定义模型网关拒绝了这次请求，请求体或接口兼容性可能有问题。\n"
++            f"原始错误: {error_type} (upstream bad request)"
++        )
++
++    error_detail = detail[:300] if detail else "no details available"
++    return (
++        f"Sorry, I encountered an error ({error_type}).\n"
++        f"{error_detail}\n"
++        "Try again or use /reset to start a fresh session."
++    )
 +
 +
 +def _strip_trailing_display_blocks(text: str) -> str:
@@ -179,7 +212,52 @@ index f7943da4..682bdd51 100644
  
  def utf16_len(s: str) -> int:
      """Count UTF-16 code units in *s*.
-@@ -1518,6 +1527,7 @@ class BasePlatformAdapter(ABC):
+@@ -807,6 +849,10 @@ class BasePlatformAdapter(ABC):
+         self._background_tasks: set[asyncio.Task] = set()
+         self._expected_cancelled_tasks: set[asyncio.Task] = set()
+         self._busy_session_handler: Optional[Callable[[MessageEvent, str], Awaitable[bool]]] = None
++        self._busy_session_ack_times: Dict[str, float] = {}
++        self._busy_session_ack_cooldown_seconds = float(
++            self.config.extra.get("busy_session_ack_cooldown_seconds", os.getenv("HERMES_BUSY_SESSION_ACK_COOLDOWN_SECONDS", "8"))
++        )
+         # Chats where auto-TTS on voice input is disabled (set by /voice off)
+         self._auto_tts_disabled_chats: set = set()
+         # Chats where typing indicator is paused (e.g. during approval waits).
+@@ -1479,6 +1525,33 @@ class BasePlatformAdapter(ABC):
+             return f"{existing_text}\n\n{new_text}".strip()
+         return existing_text
+ 
++
++    async def _maybe_ack_busy_session(self, event: MessageEvent, session_key: str, *, queued: bool = False) -> None:
++        if self._busy_session_ack_cooldown_seconds <= 0:
++            return
++
++        now = asyncio.get_running_loop().time()
++        last_sent = self._busy_session_ack_times.get(session_key, 0.0)
++        if (now - last_sent) < self._busy_session_ack_cooldown_seconds:
++            return
++        self._busy_session_ack_times[session_key] = now
++
++        thread_meta = {"thread_id": event.source.thread_id} if event.source.thread_id else None
++        message = (
++            "⏳ 收到，你的新消息我已经接住了；上一条还在处理中，这条会紧接着继续。"
++            if queued
++            else "⏳ 收到，你的新消息我已经接住了；我会中断当前处理并切到这条继续。"
++        )
++        try:
++            await self._send_with_retry(
++                chat_id=event.source.chat_id,
++                content=message,
++                reply_to=event.message_id,
++                metadata=thread_meta,
++            )
++        except Exception as exc:
++            logger.debug("[%s] Busy-session acknowledgement failed: %s", self.name, exc)
++
+     async def handle_message(self, event: MessageEvent) -> None:
+         """
+         Process an incoming message.
+@@ -1518,6 +1591,7 @@ class BasePlatformAdapter(ABC):
                      _thread_meta = {"thread_id": event.source.thread_id} if event.source.thread_id else None
                      response = await self._message_handler(event)
                      if response:
@@ -187,7 +265,23 @@ index f7943da4..682bdd51 100644
                          await self._send_with_retry(
                              chat_id=event.source.chat_id,
                              content=response,
-@@ -1617,8 +1627,25 @@ class BasePlatformAdapter(ABC):
+@@ -1541,6 +1615,7 @@ class BasePlatformAdapter(ABC):
+             if event.message_type == MessageType.PHOTO:
+                 logger.debug("[%s] Queuing photo follow-up for session %s without interrupt", self.name, session_key)
+                 merge_pending_message_event(self._pending_messages, session_key, event)
++                await self._maybe_ack_busy_session(event, session_key, queued=True)
+                 return  # Don't interrupt now - will run after current task completes
+ 
+             # Default behavior for non-photo follow-ups: interrupt the running agent
+@@ -1548,6 +1623,7 @@ class BasePlatformAdapter(ABC):
+             self._pending_messages[session_key] = event
+             # Signal the interrupt (the processing task checks this)
+             self._active_sessions[session_key].set()
++            await self._maybe_ack_busy_session(event, session_key, queued=False)
+             return  # Don't process now - will be handled after current task finishes
+         
+         # Mark session as active BEFORE spawning background task to close
+@@ -1617,8 +1693,25 @@ class BasePlatformAdapter(ABC):
          try:
              await self._run_processing_hook("on_processing_start", event)
  
@@ -215,7 +309,7 @@ index f7943da4..682bdd51 100644
              
              # Send response if any.  A None/empty response is normal when
              # streaming already delivered the text (already_sent=True) or
-@@ -1635,6 +1662,7 @@ class BasePlatformAdapter(ABC):
+@@ -1635,6 +1728,7 @@ class BasePlatformAdapter(ABC):
                  # Strip any remaining internal directives from message body (fixes #1561)
                  text_content = text_content.replace("[[audio_as_voice]]", "").strip()
                  text_content = re.sub(r"MEDIA:\s*\S+", "", text_content).strip()
@@ -223,9 +317,12 @@ index f7943da4..682bdd51 100644
                  if images:
                      logger.info("[%s] extract_images found %d image(s) in response (%d chars)", self.name, len(images), len(response))
  
-@@ -1833,17 +1861,23 @@ class BasePlatformAdapter(ABC):
-                 error_type = type(e).__name__
-                 error_detail = str(e)[:300] if str(e) else "no details available"
+@@ -1830,20 +1924,20 @@ class BasePlatformAdapter(ABC):
+             logger.error("[%s] Error handling message: %s", self.name, e, exc_info=True)
+             # Send the error to the user so they aren't left with radio silence
+             try:
+-                error_type = type(e).__name__
+-                error_detail = str(e)[:300] if str(e) else "no details available"
                  _thread_metadata = {"thread_id": event.source.thread_id} if event.source.thread_id else None
 -                await self.send(
 -                    chat_id=event.source.chat_id,
@@ -235,11 +332,7 @@ index f7943da4..682bdd51 100644
 -                        "Try again or use /reset to start a fresh session."
 -                    ),
 -                    metadata=_thread_metadata,
-+                _error_message = (
-+                    f"Sorry, I encountered an error ({error_type}).\n"
-+                    f"{error_detail}\n"
-+                    "Try again or use /reset to start a fresh session."
-+                )
++                _error_message = _format_user_visible_error(e)
 +                logger.info("[%s] Sending fallback error message to %s", self.name, event.source.chat_id)
 +                _send_result = await asyncio.shield(
 +                    self.send(
@@ -256,6 +349,55 @@ index f7943da4..682bdd51 100644
          finally:
              # Stop typing indicator
              typing_task.cancel()
+diff --git a/gateway/platforms/weixin.py b/gateway/platforms/weixin.py
+index e5859e41..02f393e4 100644
+--- a/gateway/platforms/weixin.py
++++ b/gateway/platforms/weixin.py
+@@ -81,6 +81,7 @@ EP_GET_BOT_QR = "ilink/bot/get_bot_qrcode"
+ EP_GET_QR_STATUS = "ilink/bot/get_qrcode_status"
+ 
+ LONG_POLL_TIMEOUT_MS = 35_000
++POLL_CALL_HARD_TIMEOUT_MS = 45_000
+ API_TIMEOUT_MS = 15_000
+ CONFIG_TIMEOUT_MS = 10_000
+ QR_TIMEOUT_MS = 35_000
+@@ -1165,16 +1166,20 @@ class WeixinAdapter(BasePlatformAdapter):
+ 
+         while self._running:
+             try:
+-                response = await _get_updates(
+-                    self._session,
+-                    base_url=self._base_url,
+-                    token=self._token,
+-                    sync_buf=sync_buf,
+-                    timeout_ms=timeout_ms,
++                effective_timeout_ms = max(1_000, min(timeout_ms, LONG_POLL_TIMEOUT_MS))
++                response = await asyncio.wait_for(
++                    _get_updates(
++                        self._session,
++                        base_url=self._base_url,
++                        token=self._token,
++                        sync_buf=sync_buf,
++                        timeout_ms=effective_timeout_ms,
++                    ),
++                    timeout=POLL_CALL_HARD_TIMEOUT_MS / 1000,
+                 )
+                 suggested_timeout = response.get("longpolling_timeout_ms")
+                 if isinstance(suggested_timeout, int) and suggested_timeout > 0:
+-                    timeout_ms = suggested_timeout
++                    timeout_ms = min(suggested_timeout, LONG_POLL_TIMEOUT_MS)
+ 
+                 ret = response.get("ret", 0)
+                 errcode = response.get("errcode", 0)
+@@ -1212,6 +1217,8 @@ class WeixinAdapter(BasePlatformAdapter):
+             except Exception as exc:
+                 consecutive_failures += 1
+                 logger.error("[%s] poll error (%d/%d): %s", self.name, consecutive_failures, MAX_CONSECUTIVE_FAILURES, exc)
++                if isinstance(exc, asyncio.TimeoutError):
++                    logger.warning("[%s] long-poll exceeded hard timeout; restarting poll cycle", self.name)
+                 await asyncio.sleep(BACKOFF_DELAY_SECONDS if consecutive_failures >= MAX_CONSECUTIVE_FAILURES else RETRY_DELAY_SECONDS)
+                 if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                     consecutive_failures = 0
 diff --git a/gateway/run.py b/gateway/run.py
 index c8c25256..81000462 100644
 --- a/gateway/run.py
