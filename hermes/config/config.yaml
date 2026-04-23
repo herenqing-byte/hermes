@@ -1,6 +1,6 @@
 model:
-  default: gpt-5.4
-  provider: gac_codex
+  default: claude-sonnet-4-6
+  provider: gac_anthropic
 providers: {}
 fallback_providers: []
 credential_pool_strategies: {}
@@ -112,8 +112,8 @@ auxiliary:
     api_key: ''
     timeout: 360
   compression:
-    provider: main
-    model: claude-sonnet-4-6
+    provider: auto
+    model: ''
     base_url: ''
     api_key: ''
     timeout: 120
@@ -154,15 +154,14 @@ display:
   busy_input_mode: interrupt
   bell_on_complete: false
   show_reasoning: false
-  streaming: false
+  streaming: true
   inline_diffs: true
   show_cost: false
   skin: default
-  interim_assistant_messages: false
+  interim_assistant_messages: true
   tool_progress_command: false
   tool_progress_overrides: {}
   tool_preview_length: 0
-  context_pressure_notifications: false
   platforms: {}
   tool_progress: all
   background_process_notifications: all
@@ -298,9 +297,6 @@ custom_providers:
   api_key: ''
   key_env: GAC_ANTHROPIC_API_KEY
   api_mode: anthropic_messages
-  models:
-    claude-sonnet-4-6:
-      context_length: 1000000
 - name: minimax
   base_url: https://api.minimaxi.com/anthropic
   api_key: ''
