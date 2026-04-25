@@ -24,15 +24,15 @@
       "schedule_display": "0 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 8
+        "completed": 9
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:10:25.109525+08:00",
-      "next_run_at": "2026-04-25T06:00:00+08:00",
-      "last_run_at": "2026-04-24T06:22:59.736490+08:00",
+      "next_run_at": "2026-04-26T06:00:00+08:00",
+      "last_run_at": "2026-04-25T10:18:42.466649+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -60,17 +60,17 @@
       "schedule_display": "30 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 6
+        "completed": 7
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:11:39.159515+08:00",
-      "next_run_at": "2026-04-25T06:30:00+08:00",
-      "last_run_at": "2026-04-24T06:33:43.684012+08:00",
-      "last_status": "ok",
-      "last_error": null,
+      "next_run_at": "2026-04-26T06:30:00+08:00",
+      "last_run_at": "2026-04-25T11:17:51.130157+08:00",
+      "last_status": "error",
+      "last_error": "TimeoutError: Cron job '\u516c\u4f17\u53f7\u65e5\u62a5-\u597d\u5947\u63a2\u7d22' idle for 964s (limit 600s) \u2014 last activity: delegate_task: subagent stale stream detected after 288s, reconnecting (iteration 1/50)",
       "last_delivery_error": null,
       "deliver": "daxiang:mis:herenqing",
       "origin": null
@@ -93,15 +93,15 @@
       "schedule_display": "every 360m",
       "repeat": {
         "times": null,
-        "completed": 21
+        "completed": 23
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-17T10:09:37.109163+08:00",
-      "next_run_at": "2026-04-25T06:57:37.848553+08:00",
-      "last_run_at": "2026-04-25T00:57:37.848553+08:00",
+      "next_run_at": "2026-04-26T04:37:54.755851+08:00",
+      "last_run_at": "2026-04-25T22:37:54.755851+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -109,5 +109,5 @@
       "origin": null
     }
   ],
-  "updated_at": "2026-04-25T00:57:37.849566+08:00"
+  "updated_at": "2026-04-25T22:37:54.756540+08:00"
 }
