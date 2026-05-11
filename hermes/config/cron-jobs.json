@@ -24,18 +24,18 @@
       "schedule_display": "0 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 24
+        "completed": 25
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:10:25.109525+08:00",
-      "next_run_at": "2026-05-11T06:00:00+08:00",
-      "last_run_at": "2026-05-10T09:48:29.064489+08:00",
-      "last_status": "error",
-      "last_error": "TimeoutError: Cron job '\u516c\u4f17\u53f7\u65e5\u62a5-\u6df1\u6f6e\u683c\u5f0f' idle for 952s (limit 600s) \u2014 last activity: stale stream detected after 972s, reconnecting",
-      "last_delivery_error": "delivery error: DaXiang send failed: [Errno 8] nodename nor servname provided, or not known",
+      "next_run_at": "2026-05-12T06:00:00+08:00",
+      "last_run_at": "2026-05-11T06:13:58.583517+08:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
       "deliver": "daxiang:mis:herenqing",
       "origin": null
     },
@@ -60,15 +60,15 @@
       "schedule_display": "30 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 21
+        "completed": 22
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:11:39.159515+08:00",
-      "next_run_at": "2026-05-11T06:30:00+08:00",
-      "last_run_at": "2026-05-09T06:30:26.322970+08:00",
+      "next_run_at": "2026-05-12T06:30:00+08:00",
+      "last_run_at": "2026-05-11T06:46:01.937473+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -93,21 +93,21 @@
       "schedule_display": "every 360m",
       "repeat": {
         "times": null,
-        "completed": 81
+        "completed": 85
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-17T10:09:37.109163+08:00",
-      "next_run_at": "2026-05-11T05:12:36.574559+08:00",
-      "last_run_at": "2026-05-10T23:12:36.574559+08:00",
-      "last_status": "ok",
-      "last_error": null,
-      "last_delivery_error": null,
+      "next_run_at": "2026-05-12T06:31:25.657070+08:00",
+      "last_run_at": "2026-05-12T00:31:25.657070+08:00",
+      "last_status": "error",
+      "last_error": "TimeoutError: Cron job 'we-mp-rss\u8d26\u53f7\u5de1\u68c0' idle for 929s (limit 600s) \u2014 last activity: API error recovery (attempt 3/3)",
+      "last_delivery_error": "delivery error: Weixin send failed: Cannot connect to host ilinkai.weixin.qq.com:443 ssl:default [[SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] ssl/tls alert handshake failure (_ssl.c:1016)]",
       "deliver": "weixin:o9cq809coggdcpwVLKY0SzWgLTbk@im.wechat",
       "origin": null
     }
   ],
-  "updated_at": "2026-05-10T23:12:36.575509+08:00"
+  "updated_at": "2026-05-12T00:31:25.658399+08:00"
 }
