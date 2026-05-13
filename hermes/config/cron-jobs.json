@@ -24,18 +24,18 @@
       "schedule_display": "0 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 26
+        "completed": 27
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:10:25.109525+08:00",
-      "next_run_at": "2026-05-13T06:00:00+08:00",
-      "last_run_at": "2026-05-12T07:26:52.580950+08:00",
-      "last_status": "error",
-      "last_error": "TimeoutError: Cron job '\u516c\u4f17\u53f7\u65e5\u62a5-\u6df1\u6f6e\u683c\u5f0f' idle for 1051s (limit 600s) \u2014 last activity: API error recovery (attempt 2/3)",
-      "last_delivery_error": "delivery error: DaXiang send failed: [Errno 8] nodename nor servname provided, or not known",
+      "next_run_at": "2026-05-14T06:00:00+08:00",
+      "last_run_at": "2026-05-13T07:07:57.212989+08:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
       "deliver": "daxiang:mis:herenqing",
       "origin": null
     },
@@ -60,18 +60,18 @@
       "schedule_display": "30 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 23
+        "completed": 24
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:11:39.159515+08:00",
-      "next_run_at": "2026-05-13T06:30:00+08:00",
-      "last_run_at": "2026-05-12T07:44:47.735394+08:00",
+      "next_run_at": "2026-05-14T06:30:00+08:00",
+      "last_run_at": "2026-05-13T07:08:08.409236+08:00",
       "last_status": "ok",
       "last_error": null,
-      "last_delivery_error": "delivery error: DaXiang send failed: [Errno 8] nodename nor servname provided, or not known",
+      "last_delivery_error": null,
       "deliver": "daxiang:mis:herenqing",
       "origin": null
     },
@@ -93,21 +93,21 @@
       "schedule_display": "every 360m",
       "repeat": {
         "times": null,
-        "completed": 89
+        "completed": 92
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-17T10:09:37.109163+08:00",
-      "next_run_at": "2026-05-13T08:36:32.314410+08:00",
-      "last_run_at": "2026-05-13T02:36:32.314410+08:00",
+      "next_run_at": "2026-05-14T03:14:41.519128+08:00",
+      "last_run_at": "2026-05-13T21:14:41.519128+08:00",
       "last_status": "ok",
       "last_error": null,
-      "last_delivery_error": null,
+      "last_delivery_error": "delivery error: Weixin send failed: Cannot connect to host ilinkai.weixin.qq.com:443 ssl:default [nodename nor servname provided, or not known]",
       "deliver": "weixin:o9cq809coggdcpwVLKY0SzWgLTbk@im.wechat",
       "origin": null
     }
   ],
-  "updated_at": "2026-05-13T02:36:32.315522+08:00"
+  "updated_at": "2026-05-13T21:14:41.519978+08:00"
 }
