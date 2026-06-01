@@ -24,15 +24,15 @@
       "schedule_display": "0 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 45
+        "completed": 46
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:10:25.109525+08:00",
-      "next_run_at": "2026-06-01T06:00:00+08:00",
-      "last_run_at": "2026-05-31T06:40:16.876256+08:00",
+      "next_run_at": "2026-06-02T06:00:00+08:00",
+      "last_run_at": "2026-06-01T06:02:35.747026+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": "delivery error: DaXiang send failed: ",
@@ -60,15 +60,15 @@
       "schedule_display": "30 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 40
+        "completed": 41
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:11:39.159515+08:00",
-      "next_run_at": "2026-06-01T06:30:00+08:00",
-      "last_run_at": "2026-05-31T06:58:09.851645+08:00",
+      "next_run_at": "2026-06-02T06:30:00+08:00",
+      "last_run_at": "2026-06-01T06:30:49.416160+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": "delivery error: DaXiang send failed: ",
@@ -93,15 +93,15 @@
       "schedule_display": "every 360m",
       "repeat": {
         "times": null,
-        "completed": 163
+        "completed": 167
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-17T10:09:37.109163+08:00",
-      "next_run_at": "2026-06-01T08:35:39.261085+08:00",
-      "last_run_at": "2026-06-01T02:35:39.261085+08:00",
+      "next_run_at": "2026-06-02T08:55:40.353882+08:00",
+      "last_run_at": "2026-06-02T02:55:40.353882+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -109,5 +109,5 @@
       "origin": null
     }
   ],
-  "updated_at": "2026-06-01T02:35:39.261576+08:00"
+  "updated_at": "2026-06-02T02:55:40.354897+08:00"
 }
