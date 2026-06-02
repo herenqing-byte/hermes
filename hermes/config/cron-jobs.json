@@ -24,18 +24,18 @@
       "schedule_display": "0 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 46
+        "completed": 47
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:10:25.109525+08:00",
-      "next_run_at": "2026-06-02T06:00:00+08:00",
-      "last_run_at": "2026-06-01T06:02:35.747026+08:00",
+      "next_run_at": "2026-06-03T06:00:00+08:00",
+      "last_run_at": "2026-06-02T06:07:52.098875+08:00",
       "last_status": "ok",
       "last_error": null,
-      "last_delivery_error": "delivery error: DaXiang send failed: ",
+      "last_delivery_error": null,
       "deliver": "daxiang:mis:herenqing",
       "origin": null
     },
@@ -60,18 +60,18 @@
       "schedule_display": "30 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 41
+        "completed": 42
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:11:39.159515+08:00",
-      "next_run_at": "2026-06-02T06:30:00+08:00",
-      "last_run_at": "2026-06-01T06:30:49.416160+08:00",
+      "next_run_at": "2026-06-03T06:30:00+08:00",
+      "last_run_at": "2026-06-02T06:31:06.974673+08:00",
       "last_status": "ok",
       "last_error": null,
-      "last_delivery_error": "delivery error: DaXiang send failed: ",
+      "last_delivery_error": null,
       "deliver": "daxiang:mis:herenqing",
       "origin": null
     },
@@ -93,15 +93,15 @@
       "schedule_display": "every 360m",
       "repeat": {
         "times": null,
-        "completed": 167
+        "completed": 169
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-17T10:09:37.109163+08:00",
-      "next_run_at": "2026-06-02T08:55:40.353882+08:00",
-      "last_run_at": "2026-06-02T02:55:40.353882+08:00",
+      "next_run_at": "2026-06-03T03:26:41.643035+08:00",
+      "last_run_at": "2026-06-02T21:26:41.643035+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -109,5 +109,5 @@
       "origin": null
     }
   ],
-  "updated_at": "2026-06-02T02:55:40.354897+08:00"
+  "updated_at": "2026-06-02T21:26:41.643962+08:00"
 }
