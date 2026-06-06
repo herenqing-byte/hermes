@@ -24,18 +24,18 @@
       "schedule_display": "0 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 49
+        "completed": 50
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:10:25.109525+08:00",
-      "next_run_at": "2026-06-06T06:00:00+08:00",
-      "last_run_at": "2026-06-05T06:08:33.497170+08:00",
+      "next_run_at": "2026-06-07T06:00:00+08:00",
+      "last_run_at": "2026-06-06T06:40:31.121432+08:00",
       "last_status": "ok",
       "last_error": null,
-      "last_delivery_error": "delivery error: DaXiang send failed: [Errno 8] nodename nor servname provided, or not known",
+      "last_delivery_error": null,
       "deliver": "daxiang:mis:herenqing",
       "origin": null
     },
@@ -60,18 +60,18 @@
       "schedule_display": "30 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 45
+        "completed": 46
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:11:39.159515+08:00",
-      "next_run_at": "2026-06-06T06:30:00+08:00",
-      "last_run_at": "2026-06-05T06:32:03.745787+08:00",
+      "next_run_at": "2026-06-07T06:30:00+08:00",
+      "last_run_at": "2026-06-06T06:40:42.956163+08:00",
       "last_status": "ok",
       "last_error": null,
-      "last_delivery_error": "delivery error: DaXiang send failed: [Errno 8] nodename nor servname provided, or not known",
+      "last_delivery_error": null,
       "deliver": "daxiang:mis:herenqing",
       "origin": null
     },
@@ -93,15 +93,15 @@
       "schedule_display": "every 360m",
       "repeat": {
         "times": null,
-        "completed": 178
+        "completed": 182
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-17T10:09:37.109163+08:00",
-      "next_run_at": "2026-06-06T04:55:10.514394+08:00",
-      "last_run_at": "2026-06-05T22:55:10.514394+08:00",
+      "next_run_at": "2026-06-07T09:15:09.415524+08:00",
+      "last_run_at": "2026-06-07T03:15:09.415524+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -109,5 +109,5 @@
       "origin": null
     }
   ],
-  "updated_at": "2026-06-05T22:55:10.515574+08:00"
+  "updated_at": "2026-06-07T03:15:09.416332+08:00"
 }
