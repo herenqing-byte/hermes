@@ -24,15 +24,15 @@
       "schedule_display": "0 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 56
+        "completed": 57
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:10:25.109525+08:00",
-      "next_run_at": "2026-06-16T06:00:00+08:00",
-      "last_run_at": "2026-06-15T06:26:47.027844+08:00",
+      "next_run_at": "2026-06-17T06:00:00+08:00",
+      "last_run_at": "2026-06-16T07:54:26.153018+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -60,15 +60,15 @@
       "schedule_display": "30 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 52
+        "completed": 53
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:11:39.159515+08:00",
-      "next_run_at": "2026-06-16T06:30:00+08:00",
-      "last_run_at": "2026-06-15T08:00:24.170296+08:00",
+      "next_run_at": "2026-06-17T06:30:00+08:00",
+      "last_run_at": "2026-06-16T08:00:34.383986+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -93,15 +93,15 @@
       "schedule_display": "every 360m",
       "repeat": {
         "times": null,
-        "completed": 211
+        "completed": 215
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-17T10:09:37.109163+08:00",
-      "next_run_at": "2026-06-16T04:00:21.301577+08:00",
-      "last_run_at": "2026-06-15T22:00:21.301577+08:00",
+      "next_run_at": "2026-06-17T06:52:00.387079+08:00",
+      "last_run_at": "2026-06-17T00:52:00.387079+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -109,5 +109,5 @@
       "origin": null
     }
   ],
-  "updated_at": "2026-06-15T22:00:21.302429+08:00"
+  "updated_at": "2026-06-17T00:52:00.388012+08:00"
 }
