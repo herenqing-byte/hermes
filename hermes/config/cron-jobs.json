@@ -24,15 +24,15 @@
       "schedule_display": "0 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 107
+        "completed": 108
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:10:25.109525+08:00",
-      "next_run_at": "2026-08-07T06:00:00+08:00",
-      "last_run_at": "2026-08-06T06:01:32.748412+08:00",
+      "next_run_at": "2026-08-08T06:00:00+08:00",
+      "last_run_at": "2026-08-07T06:01:26.485893+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": "delivery error: DaXiang send failed: ",
@@ -60,15 +60,15 @@
       "schedule_display": "30 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 103
+        "completed": 104
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:11:39.159515+08:00",
-      "next_run_at": "2026-08-07T06:30:00+08:00",
-      "last_run_at": "2026-08-06T06:30:59.193627+08:00",
+      "next_run_at": "2026-08-08T06:30:00+08:00",
+      "last_run_at": "2026-08-07T06:30:53.463735+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": "delivery error: DaXiang send failed: ",
@@ -93,15 +93,15 @@
       "schedule_display": "every 360m",
       "repeat": {
         "times": null,
-        "completed": 405
+        "completed": 409
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-17T10:09:37.109163+08:00",
-      "next_run_at": "2026-08-07T04:08:23.827159+08:00",
-      "last_run_at": "2026-08-06T22:08:23.827159+08:00",
+      "next_run_at": "2026-08-08T04:11:02.973872+08:00",
+      "last_run_at": "2026-08-07T22:11:02.973872+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -109,5 +109,5 @@
       "origin": null
     }
   ],
-  "updated_at": "2026-08-06T22:08:23.827755+08:00"
+  "updated_at": "2026-08-07T22:11:02.974902+08:00"
 }
