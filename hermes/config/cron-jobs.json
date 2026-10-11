@@ -24,15 +24,15 @@
       "schedule_display": "0 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 167
+        "completed": 168
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:10:25.109525+08:00",
-      "next_run_at": "2026-10-11T06:00:00+08:00",
-      "last_run_at": "2026-10-10T07:30:59.033151+08:00",
+      "next_run_at": "2026-10-12T06:00:00+08:00",
+      "last_run_at": "2026-10-11T07:04:18.117596+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": "delivery error: DaXiang send failed: [Errno 8] nodename nor servname provided, or not known",
@@ -60,15 +60,15 @@
       "schedule_display": "30 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 163
+        "completed": 164
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:11:39.159515+08:00",
-      "next_run_at": "2026-10-11T06:30:00+08:00",
-      "last_run_at": "2026-10-10T08:03:31.654790+08:00",
+      "next_run_at": "2026-10-12T06:30:00+08:00",
+      "last_run_at": "2026-10-11T07:04:51.522701+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": "delivery error: DaXiang send failed: [Errno 8] nodename nor servname provided, or not known",
@@ -93,21 +93,21 @@
       "schedule_display": "every 360m",
       "repeat": {
         "times": null,
-        "completed": 643
+        "completed": 646
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-17T10:09:37.109163+08:00",
-      "next_run_at": "2026-10-11T07:00:28.143425+08:00",
-      "last_run_at": "2026-10-11T01:00:28.143425+08:00",
-      "last_status": "error",
-      "last_error": "TimeoutError: Cron job 'we-mp-rss\u8d26\u53f7\u5de1\u68c0' idle for 2129s (limit 600s) \u2014 last activity: API error recovery (attempt 2/3)",
-      "last_delivery_error": "delivery error: Weixin send failed: Cannot connect to host ilinkai.weixin.qq.com:443 ssl:default [nodename nor servname provided, or not known]",
+      "next_run_at": "2026-10-12T03:39:24.188762+08:00",
+      "last_run_at": "2026-10-11T21:39:24.188762+08:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
       "deliver": "weixin:o9cq809coggdcpwVLKY0SzWgLTbk@im.wechat",
       "origin": null
     }
   ],
-  "updated_at": "2026-10-11T01:00:28.144316+08:00"
+  "updated_at": "2026-10-11T21:39:24.189646+08:00"
 }
