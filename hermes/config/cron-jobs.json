@@ -24,15 +24,15 @@
       "schedule_display": "0 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 171
+        "completed": 172
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:10:25.109525+08:00",
-      "next_run_at": "2026-10-15T06:00:00+08:00",
-      "last_run_at": "2026-10-14T06:00:37.050935+08:00",
+      "next_run_at": "2026-10-16T06:00:00+08:00",
+      "last_run_at": "2026-10-15T06:00:44.965000+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -60,15 +60,15 @@
       "schedule_display": "30 6 * * *",
       "repeat": {
         "times": null,
-        "completed": 167
+        "completed": 168
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-16T17:11:39.159515+08:00",
-      "next_run_at": "2026-10-15T06:30:00+08:00",
-      "last_run_at": "2026-10-14T06:30:53.143270+08:00",
+      "next_run_at": "2026-10-16T06:30:00+08:00",
+      "last_run_at": "2026-10-15T06:31:00.654296+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -93,15 +93,15 @@
       "schedule_display": "every 360m",
       "repeat": {
         "times": null,
-        "completed": 658
+        "completed": 662
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-04-17T10:09:37.109163+08:00",
-      "next_run_at": "2026-10-15T04:59:00.223819+08:00",
-      "last_run_at": "2026-10-14T22:59:00.223819+08:00",
+      "next_run_at": "2026-10-16T05:03:09.659426+08:00",
+      "last_run_at": "2026-10-15T23:03:09.659426+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -109,5 +109,5 @@
       "origin": null
     }
   ],
-  "updated_at": "2026-10-14T22:59:00.224294+08:00"
+  "updated_at": "2026-10-15T23:03:09.660313+08:00"
 }
